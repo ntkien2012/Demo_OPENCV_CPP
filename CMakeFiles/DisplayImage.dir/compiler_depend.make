@@ -422,7 +422,11 @@ CMakeFiles/DisplayImage.dir/DisplayImage.cpp.o: DisplayImage.cpp \
   /usr/include/c++/11/fstream \
   /usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
-  /usr/include/c++/11/bits/fstream.tcc
+  /usr/include/c++/11/bits/fstream.tcc \
+  /usr/include/c++/11/thread \
+  /usr/include/c++/11/bits/std_thread.h \
+  /usr/include/c++/11/bits/this_thread_sleep.h \
+  /usr/include/c++/11/condition_variable
 
 
 /usr/include/c++/11/bits/fstream.tcc:
@@ -588,6 +592,10 @@ CMakeFiles/DisplayImage.dir/DisplayImage.cpp.o: DisplayImage.cpp \
 /usr/include/c++/11/bits/parse_numbers.h:
 
 /usr/include/c++/11/ctime:
+
+/usr/include/c++/11/condition_variable:
+
+/usr/include/c++/11/thread:
 
 /usr/include/c++/11/ratio:
 
@@ -849,6 +857,8 @@ CMakeFiles/DisplayImage.dir/DisplayImage.cpp.o: DisplayImage.cpp \
 
 /usr/include/x86_64-linux-gnu/sys/select.h:
 
+/usr/include/c++/11/bits/std_thread.h:
+
 /usr/include/c++/11/bits/cpp_type_traits.h:
 
 /usr/include/c++/11/bits/stl_iterator_base_funcs.h:
@@ -1010,6 +1020,8 @@ CMakeFiles/DisplayImage.dir/DisplayImage.cpp.o: DisplayImage.cpp \
 /usr/include/c++/11/bits/memoryfwd.h:
 
 /usr/include/c++/11/bits/stringfwd.h:
+
+/usr/include/c++/11/bits/this_thread_sleep.h:
 
 /usr/include/c++/11/bits/locale_facets.tcc:
 
