@@ -35,6 +35,14 @@ void videoProcessingThread(cv::VideoCapture& video_capture, std::queue<Processed
 // Function to save pixel values of an image to a text file
 void savePixelValues(const cv::Mat& image, const std::string& filename);
 
+//Function merge intersecting
+void mergeIntersectingRectangles(std::vector<cv::Rect>& rectangles);
+
+//Function merge all object
+cv::Rect mergeAllObjects(const std::vector<cv::Rect>& objects);
+
+int calNumberofSlidingWindow(int imageWidth, int imageHeight);
+ 
 int main() {
     cv::VideoCapture video_capture("/home/kiennt90/Demo_HOG_inCPP/test.mp4");
 
@@ -94,10 +102,11 @@ int main() {
 
 void videoProcessingThread(cv::VideoCapture& video_capture, std::queue<ProcessedFrame>& frameQueue, std::mutex& queueMutex, std::condition_variable& condition) {
     int count_frame = 0;
+    int count_slidingwindow = 0;
     cv::Mat previousFrame, frameDiff, threshFrame;
     cv::Ptr<cv::BackgroundSubtractorMOG2> bgSubtractor = cv::createBackgroundSubtractorMOG2();
 
-	auto start_time = std::chrono::high_resolution_clock::now();
+    auto start_time = std::chrono::high_resolution_clock::now();
     while (true) {
         cv::Mat frame;
         bool ret = video_capture.read(frame);
@@ -128,32 +137,54 @@ void videoProcessingThread(cv::VideoCapture& video_capture, std::queue<Processed
         std::vector<cv::Rect> nonOverlappingRectangles;
         findNonOverlappingRectangles(contours, nonOverlappingRectangles);
 
-        std::vector<cv::Rect> mergedRectangles;
-        mergeOverlappingRectangles(nonOverlappingRectangles, mergedRectangles);
-
+#if 0 	//Merge intersecting
+        //std::vector<cv::Rect> mergedRectangles;
+        //mergeOverlappingRectangles(nonOverlappingRectangles, mergedRectangles);
+        
+	// Merge intersecting rectangles into one
+        mergeIntersectingRectangles(nonOverlappingRectangles);
+        
         int imageCounter = 0;
-        for (const auto& mergedRect : mergedRectangles) {
+        for (const auto& mergedRect : nonOverlappingRectangles) {
             // Push the processed frame and associated data to the queue
             {
+            	// Draw a green rectangle around the detected object
+            	cv::rectangle(frame, mergedRect, cv::Scalar(0, 255, 255), 2);
                 std::unique_lock<std::mutex> lock(queueMutex);
                 frameQueue.push({frame(mergedRect).clone(), count_frame, imageCounter});
                 condition.notify_all();
             }
             imageCounter++;
         }
-#if 0
+#endif
+
+#if 1 	//Merge all object into 1
+        cv::Rect mergedAll = mergeAllObjects(nonOverlappingRectangles);
+        std::cout << "Frame_" << count_frame << " width: " << mergedAll.width << " height: " << mergedAll.height << " Sliding window: " << calNumberofSlidingWindow(mergedAll.width, mergedAll.height) << std::endl ;
+        count_slidingwindow += calNumberofSlidingWindow(mergedAll.width, mergedAll.height);
+        int imageCounter = 0;
+    	//cv::rectangle(frame, mergedAll, cv::Scalar(0, 255, 0), 2);
+        std::unique_lock<std::mutex> lock(queueMutex);
+        frameQueue.push({frame(mergedAll).clone(), count_frame, imageCounter});
+        condition.notify_all();
+#endif
+
+#if 1
         cv::imshow("Frame", frame);
         int keyboard = cv::waitKey(30);
         if (keyboard == 'q' || keyboard == 27) {
             break;
         }
- #endif
+#endif 	
     }
     
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time = std::chrono::duration<double>(end_time - start_time).count();
     std::cout << "Total processing time: " << elapsed_time << " seconds" << std::endl;
     std::cout << "Total frames processed: " << count_frame << std::endl;
+    std::cout << "Total sliding window new: " << count_slidingwindow << std::endl;
+    std::cout << "Total sliding window old: " << 27960 * count_frame << std::endl;
+    std::cout << ((float)count_slidingwindow/(27960.0 * (float)count_frame))*100.0 << std::endl;
 }
 
 bool areRectanglesOverlapping(const cv::Rect& rect1, const cv::Rect& rect2) {
@@ -209,12 +240,68 @@ void savePixelValues(const cv::Mat& image, const std::string& filename) {
         return;
     }
 
-    std::ofstream outputFile(filename);
-    for (int j = 0; j < image.rows; j++) {
-        for (int i = 0; i < image.cols; i++) {
-            outputFile << (int)image.at<uchar>(j, i) << " ";
-        }
-        outputFile << "\n";
+    // Open the file for writing in binary mode
+    std::ofstream outputFile(filename, std::ios::out | std::ios::binary);
+    if (!outputFile.is_open()) {
+        std::cerr << "Failed to open file for writing." << std::endl;
+        return;
     }
+
+    // Write the entire image data to the file at once
+    outputFile.write(reinterpret_cast<const char*>(image.data), image.total() * image.elemSize());
+
     outputFile.close();
 }
+
+void mergeIntersectingRectangles(std::vector<cv::Rect>& rectangles) {
+    std::vector<cv::Rect> mergedRectangles;
+
+    for (const auto& rect : rectangles) {
+        bool merged = false;
+
+        for (auto& mergedRect : mergedRectangles) {
+            if (areRectanglesOverlapping(rect, mergedRect)) {
+                mergedRect |= rect; // Merge the rectangles
+                merged = true;
+                break;
+            }
+        }
+
+        if (!merged) {
+            // If the current rectangle didn't merge with any existing rectangles,
+            // add it as a new merged rectangle.
+            mergedRectangles.push_back(rect);
+        }
+    }
+
+    // Update the input vector with the merged rectangles.
+    rectangles = mergedRectangles;
+}
+
+cv::Rect mergeAllObjects(const std::vector<cv::Rect>& objects) {
+    if (objects.empty()) {
+        // Return an empty rectangle if there are no objects to merge.
+        return cv::Rect();
+    }
+
+    // Initialize the merged rectangle with the first object.
+    cv::Rect mergedRect = objects[0];
+
+    // Iterate through the remaining objects and expand the merged rectangle to cover all objects.
+    for (size_t i = 1; i < objects.size(); ++i) {
+        mergedRect |= objects[i];
+    }
+
+    return mergedRect;
+}
+
+int calNumberofSlidingWindow(int imageWidth, int imageHeight){
+    int windowWidth = 64;
+    int windowHeight = 128;
+    int step = 8;
+    // Calculate the number of sliding windows in the horizontal and vertical directions
+    int horizontalWindows = (imageWidth - windowWidth) / step + 1;
+    int verticalWindows = (imageHeight - windowHeight) / step + 1;
+    return horizontalWindows * verticalWindows;
+}
+

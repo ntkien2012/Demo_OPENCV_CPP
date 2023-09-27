@@ -1,0 +1,5 @@
+Hello,
+Welcome to Vim tutorial for beginers
+.Hello
+.Hello
+Welcom to Vim
